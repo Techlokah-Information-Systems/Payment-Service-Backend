@@ -5,11 +5,66 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider = "prisma-client"
+  provider = "prisma-client-js"
   output   = "../generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+model Payment {
+  id                 BigInt     @id @default(autoincrement())
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  // External system reference
+  externalRef        String     // e.g., order_id, invoice_id from your other app
+  sourceApp          String     // "ecommerce", "saas", etc. (optional multi-tenant flag)
+
+  razorpayOrderId    String?    @unique
+  razorpayPaymentId  String?    @unique
+
+  amountPaise        BigInt
+  currency           String
+  status             String     // 'created' | 'paid' | 'failed' | 'refunded'
+  method             String?
+  email              String?
+  contact            String?
+
+  // Optional metadata for flexibility
+  metadata           Json?
+
+  Refunds            Refund[]
+}
+
+model Refund {
+  id               BigInt   @id @default(autoincrement())
+  createdAt        DateTime @default(now())
+  paymentId        BigInt
+  payment          Payment  @relation(fields: [paymentId], references: [id])
+  razorpayRefundId String?  @unique
+  amountPaise      BigInt
+  status           String
+  reason           String?
+}
+
+model IdempotencyKey {
+  id          BigInt   @id @default(autoincrement())
+  createdAt   DateTime @default(now())
+  scope       String
+  idemKey     String
+  requestHash String
+  response    Json
+  @@unique([scope, idemKey])
+}
+
+model WebhookEvent {
+  id         BigInt   @id @default(autoincrement())
+  receivedAt DateTime @default(now())
+  eventId    String   @unique
+  eventType  String
+  body       Json
+  paymentId  String?
 }

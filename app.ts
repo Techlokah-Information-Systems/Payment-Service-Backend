@@ -1,12 +1,62 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import express from "express";
+import cors from "cors";
+import helmet from "helmet";
+import morgan from "morgan";
+import rateLimit from "express-rate-limit";
+import { raw } from "body-parser";
+import routes from "./routes/payment";
+import {
+  ENVIRONMENT,
+  RAZORPAY_TEST_KEY_ID,
+  RAZORPAY_TEST_SECRET_KEY,
+  RAZORPAY_WEBHOOK_SECRET,
+} from "./utils/constants";
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
+// Trust proxy for ngrok
+app.set("trust proxy", 1);
+
+app.use(helmet());
+app.use(cors());
+app.use(express.json({ limit: "200kb" }));
+app.use(morgan(ENVIRONMENT === "production" ? "combined" : "dev"));
+app.use(
+  "/webhooks/razorpay",
+  raw({
+    type: "*/*",
+    limit: "200kb",
+  })
+);
+app.use(
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+    standardHeaders: true,
+    legacyHeaders: false,
+  })
+);
+
+app.use(routes);
 app.get("/", (req, res) => {
-  res.send("Payment Service Backend is running!");
+  res.status(200).json({ message: "Payment Service is running." });
+});
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok" });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+app.use((err: any, _req: any, res: any, _next: any) => {
+  if (ENVIRONMENT !== "production") {
+    console.error(err);
+  }
+
+  const status = err.statusCode || 500;
+  res.status(status).json({
+    error: "internal_server_error",
+  });
 });
+
+export default app;
