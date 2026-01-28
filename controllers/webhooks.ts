@@ -1,4 +1,4 @@
-import crypto from "crypto";
+import crypto from "node:crypto";
 import prisma from "../utils/db";
 import { Request, Response } from "express";
 import { RAZORPAY_WEBHOOK_SECRET } from "../utils/constants";

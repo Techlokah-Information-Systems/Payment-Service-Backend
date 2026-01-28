@@ -8,12 +8,7 @@ import morgan from "morgan";
 import rateLimit from "express-rate-limit";
 import { raw } from "body-parser";
 import routes from "./routes/payment";
-import {
-  ENVIRONMENT,
-  RAZORPAY_TEST_KEY_ID,
-  RAZORPAY_TEST_SECRET_KEY,
-  RAZORPAY_WEBHOOK_SECRET,
-} from "./utils/constants";
+import { ENVIRONMENT, FRONTEND_URL } from "./utils/constants";
 
 const app = express();
 
@@ -21,7 +16,11 @@ const app = express();
 app.set("trust proxy", 1);
 
 app.use(helmet());
-app.use(cors());
+app.use(
+  cors({
+    origin: [FRONTEND_URL, "http://localhost:3000"],
+  }),
+);
 app.use(express.json({ limit: "200kb" }));
 app.use(morgan(ENVIRONMENT === "production" ? "combined" : "dev"));
 app.use(
@@ -29,7 +28,7 @@ app.use(
   raw({
     type: "*/*",
     limit: "200kb",
-  })
+  }),
 );
 app.use(
   rateLimit({
@@ -37,7 +36,7 @@ app.use(
     max: 100,
     standardHeaders: true,
     legacyHeaders: false,
-  })
+  }),
 );
 
 app.use(routes);

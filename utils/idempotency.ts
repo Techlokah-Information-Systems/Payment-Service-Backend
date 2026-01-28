@@ -1,4 +1,4 @@
-import crypto from "crypto";
+import crypto from "node:crypto";
 import prisma from "./db";
 import { NextFunction, Request, Response } from "express";
 

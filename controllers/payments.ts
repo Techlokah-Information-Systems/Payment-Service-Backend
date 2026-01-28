@@ -1,5 +1,5 @@
 import Razorpay from "razorpay";
-import crypto from "crypto";
+import crypto from "node:crypto";
 import prisma from "../utils/db";
 import { Response, Request } from "express";
 import {
@@ -30,7 +30,7 @@ export async function initiate(req: Request, res: Response) {
       payment_capture: true,
     });
 
-    const payment = await prisma.payment.create({
+    await prisma.payment.create({
       data: {
         externalRef,
         sourceApp,
@@ -54,7 +54,7 @@ export async function initiate(req: Request, res: Response) {
     if ((res as any).saveIdempotent) {
       await (res as any).saveIdempotent(payload);
     }
-
+    console.log("Payment initiated successfully:", rOrder);
     return res.status(201).json(payload);
   } catch (error) {
     console.error("Error initiating payment:", error);
@@ -101,9 +101,11 @@ export async function confirm(req: Request, res: Response) {
       },
     });
 
-    return res
-      .status(200)
-      .json({ status: rPayment.status, externalRef: paymentRow.externalRef });
+    return res.status(200).json({
+      rPayment,
+      status: rPayment.status,
+      externalRef: paymentRow.externalRef,
+    });
   } catch (error) {
     console.error("Error confirming payment:", error);
     return res.status(500).json({ error: "internal_server_error" });
@@ -128,7 +130,7 @@ export async function refund(req: Request, res: Response) {
       },
     });
 
-    if (!payment || !payment.razorpayPaymentId) {
+    if (!payment?.razorpayPaymentId) {
       return res.status(404).json({ error: "payment_not_found_or_unpaid" });
     }
 
