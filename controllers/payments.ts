@@ -1,11 +1,16 @@
 import Razorpay from "razorpay";
-import crypto from "crypto";
+import crypto from "node:crypto";
 import prisma from "../utils/db";
 import { Response, Request } from "express";
 import {
   RAZORPAY_TEST_KEY_ID,
   RAZORPAY_TEST_SECRET_KEY,
 } from "../utils/constants";
+import {
+  mapRazorpayPaymentStatus,
+  mapRazorpayRefundStatus,
+} from "../utils/mappers";
+import { PaymentStatus } from "../generated/prisma";
 
 const rzp = new Razorpay({
   key_id: RAZORPAY_TEST_KEY_ID,
@@ -17,7 +22,11 @@ export async function initiate(req: Request, res: Response) {
     req.body;
 
   try {
-    const amountInPaise = amount * 100;
+    const numAmount = Number(amount);
+    if (!amount || Number.isNaN(numAmount) || numAmount <= 0) {
+      return res.status(400).json({ error: "invalid_amount" });
+    }
+    const amountInPaise = Math.round(numAmount * 100);
     const rOrder = await rzp.orders.create({
       amount: amountInPaise,
       currency: currency,
@@ -34,13 +43,13 @@ export async function initiate(req: Request, res: Response) {
       data: {
         externalRef,
         sourceApp,
-        amountPaise: amountInPaise,
+        amountPaise: BigInt(amountInPaise),
         currency,
-        email,
-        contact,
-        metadata,
+        email: email || null,
+        contact: contact || null,
+        metadata: metadata || null,
         razorpayOrderId: rOrder.id,
-        status: "created",
+        status: PaymentStatus.CREATED,
       },
     });
 
@@ -70,7 +79,23 @@ export async function confirm(req: Request, res: Response) {
     .update(razorpay_order_id + "|" + razorpay_payment_id)
     .digest("hex");
 
-  if (expectedSignature !== razorpay_signature) {
+  if (
+    !razorpay_payment_id ||
+    !razorpay_order_id ||
+    !razorpay_signature ||
+    !expectedSignature
+  ) {
+    return res.status(400).json({ error: "missing_required_fields" });
+  }
+
+  const generatedSignatureBuffer = Buffer.from(expectedSignature);
+  const receivedSignatureBuffer = Buffer.from(razorpay_signature);
+
+  const isAuthentic =
+    generatedSignatureBuffer.length === receivedSignatureBuffer.length &&
+    crypto.timingSafeEqual(generatedSignatureBuffer, receivedSignatureBuffer);
+
+  if (!isAuthentic) {
     return res.status(400).json({ error: "invalid_signature" });
   }
 
@@ -90,8 +115,8 @@ export async function confirm(req: Request, res: Response) {
       where: { id: paymentRow.id },
       data: {
         razorpayPaymentId: razorpay_payment_id,
-        status: rPayment.status,
-        method: rPayment.method,
+        status: mapRazorpayPaymentStatus(rPayment.status),
+        method: rPayment.method || null,
         email: rPayment.email || paymentRow.email || null,
         contact:
           rPayment.contact?.toString() ||
@@ -114,17 +139,29 @@ export async function refund(req: Request, res: Response) {
   const { paymentRef, amount, reason } = req.body;
 
   try {
+    let paymentIdSearch: bigint | undefined;
+    if (
+      typeof paymentRef === "number" ||
+      (typeof paymentRef === "string" && /^\d+$/.test(paymentRef))
+    ) {
+      paymentIdSearch = BigInt(paymentRef);
+    }
+
+    const whereConditions: any[] = [];
+    if (paymentIdSearch) {
+      whereConditions.push({ id: paymentIdSearch });
+    }
+    if (typeof paymentRef === "string") {
+      whereConditions.push({ externalRef: paymentRef });
+    }
+
+    if (whereConditions.length === 0) {
+      return res.status(400).json({ error: "invalid_payment_reference" });
+    }
+
     const payment = await prisma.payment.findFirst({
       where: {
-        OR: [
-          {
-            id: typeof paymentRef === "number" ? BigInt(paymentRef) : undefined,
-          },
-          {
-            externalRef:
-              typeof paymentRef === "string" ? paymentRef : undefined,
-          },
-        ].filter(Boolean) as any,
+        OR: whereConditions,
       },
     });
 
@@ -132,18 +169,25 @@ export async function refund(req: Request, res: Response) {
       return res.status(404).json({ error: "payment_not_found_or_unpaid" });
     }
 
-    const rRefund = await rzp.payments.refund(payment.razorpayPaymentId, {
-      amount: amount ? amount * 100 : undefined,
+    const refundPayload: any = {
       notes: reason ? { reason } : undefined,
-    } as any);
+    };
+    if (amount !== undefined && amount !== null) {
+      refundPayload.amount = Math.round(Number(amount) * 100);
+    }
+
+    const rRefund = await rzp.payments.refund(
+      payment.razorpayPaymentId,
+      refundPayload,
+    );
 
     await prisma.refund.create({
       data: {
         paymentId: payment.id,
         razorpayRefundId: rRefund.id,
-        amountPaise: Number(rRefund.amount ?? 0),
+        amountPaise: BigInt(rRefund.amount ?? 0),
         reason: reason || null,
-        status: rRefund.status,
+        status: mapRazorpayRefundStatus(rRefund.status),
       },
     });
 
