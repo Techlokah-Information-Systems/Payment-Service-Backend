@@ -4,13 +4,13 @@ A robust and secure payment microservice built with Express.js, TypeScript, and 
 
 ## Features
 
-- 🔒 Secure payment processing with Razorpay
-- ♻️ Idempotency support for safe retries
-- 🪝 Webhook handling for payment updates
-- 📊 Database tracking for payments and refunds
-- 🔍 Comprehensive payment lifecycle management
-- 🚀 Built with TypeScript for type safety
-- 📝 Prisma ORM for database operations
+- Secure payment processing with Razorpay
+- Idempotency support for safe retries
+- Webhook handling for payment updates
+- Database tracking for payments and refunds
+- Comprehensive payment lifecycle management
+- Built with TypeScript for type safety
+- Prisma ORM for database operations
 
 ## Prerequisites
 

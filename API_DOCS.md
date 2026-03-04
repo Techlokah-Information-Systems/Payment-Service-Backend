@@ -6,7 +6,7 @@ The service is built on top of **Node.js, Express, Prisma (PostgreSQL), and Razo
 
 ---
 
-## 🏗 General Architecture & Flow
+## General Architecture & Flow
 
 The Payment Service acts as an intermediary between our client applications (frontend web/mobile apps) and the Razorpay gateway.
 
@@ -20,7 +20,7 @@ The Payment Service acts as an intermediary between our client applications (fro
 
 ---
 
-## 🔒 1. Idempotency
+## 1. Idempotency
 
 Several endpoints require an `Idempotency-Key` header. This prevents accidental double-charging if a user clicks a button twice or a network request is retried.
 
@@ -32,7 +32,7 @@ When you send a request with an existing idempotency key, the backend will retur
 
 ---
 
-## 💰 2. One-Time Payments
+## 2. One-Time Payments
 
 ### A. Initiate Payment
 
@@ -93,7 +93,7 @@ _(Note: There is a legacy endpoint `POST /payments/confirm` available, but its u
 
 ---
 
-## 🔄 3. Subscriptions & Invoices
+## 3. Subscriptions & Invoices
 
 The backend handles Subscriptions natively via webhooks. Unlike one-time payments that you initiate through our backend, subscriptions are generally created using Razorpay APIs natively (or via future endpoints).
 
@@ -116,7 +116,7 @@ Once a subscription is active, the Payment Service automatically listens to the 
 
 ---
 
-## 🔙 4. Refunds
+## 4. Refunds
 
 If you need to refund a customer, use the Refund API.
 
@@ -144,7 +144,7 @@ If you need to refund a customer, use the Refund API.
 
 ---
 
-## 📋 5. Webhooks Configuration (For DevOps/Admins)
+## 5. Webhooks Configuration (For DevOps/Admins)
 
 Ensure the Razorpay dashboard is configured to point its webhooks to our production URL:
 
@@ -166,7 +166,7 @@ Ensure `RAZORPAY_WEBHOOK_SECRET` in the `.env` file matches the secret set in th
 
 ---
 
-## 🗄️ 6. Database Schema Types & Enums Note
+## 6. Database Schema Types & Enums Note
 
 All monetary values are stored in the database as **`BigInt` representing the smallest currency unit (e.g., paise, cents)**.
 

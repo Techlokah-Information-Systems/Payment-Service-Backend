@@ -3,51 +3,51 @@
 | (e.g. ecommerce) | | (Express + Prisma + Razorpay) | | & WEBHOOKS |
 +--------------------+ +---------------------------------+ +-----------------+
 | | |
-| 1️⃣ Create payment intent | |
+| 1 Create payment intent | |
 |------------------------------------->| |
 | POST /payments/initiate | |
 | {externalRef, amount,...} | |
 | | |
-| | 2️⃣ Creates Razorpay Order ------>|  
+| | 2 Creates Razorpay Order ------>|  
  | | (via Razorpay SDK) |
 | | |
-| | 3️⃣ Stores Payment row in DB |
+| | 3 Stores Payment row in DB |
 | | |
-| 4️⃣ Responds {orderId, keyId,...} <-------------------------------------|
+| 4 Responds {orderId, keyId,...} <-------------------------------------|
 | | |
-| 5️⃣ Opens Razorpay Checkout | |
+| 5 Opens Razorpay Checkout | |
 | using orderId + keyId | |
 |------------------------------------- Razorpay Checkout ----------------->|
 | | |
-| 6️⃣ User completes payment | |
+| 6️ User completes payment | |
 |<------------------------------------ Razorpay returns success ----------|
 | | |
-| 7️⃣ Client POST /payments/confirm | |
+| 7️ Client POST /payments/confirm | |
 | {order_id, payment_id, signature} | |
 |------------------------------------->| |
-| | 8️⃣ Verify signature (HMAC) |
-| | 9️⃣ Fetch payment from Razorpay |
-| | 🔟 Update DB (status=paid) |
+| | 8️ Verify signature (HMAC) |
+| | 9️ Fetch payment from Razorpay |
+| | 10 Update DB (status=paid) |
 |<-------------------------------------| |
-| 11️⃣ Respond {status: "paid"} | |
+| 11 Respond {status: "paid"} | |
 | | |
-| | 12️⃣ Razorpay sends webhook ----->|
+| | 12 Razorpay sends webhook ----->|
 | | /webhooks/razorpay |
 | | (payment.captured, failed) |
 | | |
-| | 13️⃣ Verify webhook signature |
-| | 14️⃣ Idempotent store event |
-| | 15️⃣ Update payment status again |
+| | 13 Verify webhook signature |
+| | 14 Idempotent store event |
+| | 15 Update payment status again |
 | | (safe even if confirm already ran)|
 | | |
-| | 16️⃣ Respond 200 OK to Razorpay |
+| | 16 Respond 200 OK to Razorpay |
 | | |
 | | |
-| | 17️⃣ Optional Refunds Flow |
+| | 17 Optional Refunds Flow |
 |------------------------------------->|---------------------------------->|
 | POST /payments/refund | Razorpay.refund(payment_id) |
 | (amount, reason) | |
 | | Store refund row in DB |
 |<-------------------------------------| |
-| 18️⃣ Respond {refundId, status} | |
+| 18 Respond {refundId, status} | |
 | | |
