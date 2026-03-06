@@ -10,14 +10,15 @@ import {
   mapRazorpayPaymentStatus,
   mapRazorpayRefundStatus,
 } from "../utils/mappers";
-import { PaymentStatus } from "../generated/prisma";
+import { PaymentStatus, RazorpayPaymentMethod } from "../generated/prisma";
+import { catchAsyncError } from "../middlewares/catchAsyncError";
 
 const rzp = new Razorpay({
   key_id: RAZORPAY_TEST_KEY_ID,
   key_secret: RAZORPAY_TEST_SECRET_KEY,
 });
 
-export async function initiate(req: Request, res: Response) {
+export const initiate = catchAsyncError(async (req: Request, res: Response) => {
   const { externalRef, sourceApp, amount, currency, email, contact, metadata } =
     req.body;
 
@@ -39,7 +40,7 @@ export async function initiate(req: Request, res: Response) {
       payment_capture: true,
     });
 
-    const payment = await prisma.payment.create({
+    await prisma.payment.create({
       data: {
         externalRef,
         sourceApp,
@@ -69,9 +70,9 @@ export async function initiate(req: Request, res: Response) {
     console.error("Error initiating payment:", error);
     return res.status(500).json({ error: "internal_server_error" });
   }
-}
+});
 
-export async function confirm(req: Request, res: Response) {
+export const confirm = catchAsyncError(async (req: Request, res: Response) => {
   const { razorpay_payment_id, razorpay_order_id, razorpay_signature } =
     req.body;
   const expectedSignature = crypto
@@ -116,7 +117,7 @@ export async function confirm(req: Request, res: Response) {
       data: {
         razorpayPaymentId: razorpay_payment_id,
         status: mapRazorpayPaymentStatus(rPayment.status),
-        method: rPayment.method || null,
+        method: (rPayment.method as RazorpayPaymentMethod) || null,
         email: rPayment.email || paymentRow.email || null,
         contact:
           rPayment.contact?.toString() ||
@@ -133,9 +134,9 @@ export async function confirm(req: Request, res: Response) {
     console.error("Error confirming payment:", error);
     return res.status(500).json({ error: "internal_server_error" });
   }
-}
+});
 
-export async function refund(req: Request, res: Response) {
+export const refund = catchAsyncError(async (req: Request, res: Response) => {
   const { paymentRef, amount, reason } = req.body;
 
   try {
@@ -206,4 +207,72 @@ export async function refund(req: Request, res: Response) {
     console.error("Error processing refund:", error);
     return res.status(500).json({ error: "internal_server_error" });
   }
-}
+});
+
+export const sendPaymentLink = catchAsyncError(
+  async (req: Request, res: Response) => {
+    const {
+      externalRef,
+      sourceApp,
+      amount,
+      currency,
+      email,
+      contact,
+      metadata,
+      name,
+    } = req.body;
+
+    try {
+      const numAmount = Number(amount);
+      if (!amount || Number.isNaN(numAmount) || numAmount <= 0) {
+        return res.status(400).json({ error: "invalid_amount" });
+      }
+      const amountInPaise = Math.round(numAmount * 100);
+      const rOrder = await rzp.paymentLink.create({
+        amount: amountInPaise,
+        currency: currency,
+        notes: {
+          sourceApp,
+          externalRef,
+          ...metadata,
+        },
+        accept_partial: false,
+        description: "Payment Link",
+        customer: {
+          name: name || "unknown",
+          email: email,
+          contact: contact,
+        },
+        notify: {
+          sms: true,
+          email: true,
+        },
+        reminder_enable: true,
+        callback_url: "https://youtube.com",
+        callback_method: "get",
+      });
+
+      await prisma.payment.create({
+        data: {
+          externalRef,
+          sourceApp,
+          amountPaise: BigInt(amountInPaise),
+          currency,
+          email: email || null,
+          contact: contact || null,
+          metadata: metadata || null,
+          status: PaymentStatus.CREATED,
+          razorpayPaymentLink: rOrder.id,
+        },
+      });
+
+      console.log("Payment link created:", rOrder);
+      return res.status(201).json({
+        paymentLink: rOrder,
+      });
+    } catch (error) {
+      console.error("Error creating payment link:", error);
+      return res.status(500).json({ error: "internal_server_error" });
+    }
+  },
+);

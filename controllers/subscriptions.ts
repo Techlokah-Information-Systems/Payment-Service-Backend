@@ -10,6 +10,7 @@ import {
   RAZORPAY_LIVE_KEY_ID,
   RAZORPAY_LIVE_SECRET_KEY,
 } from "../utils/constants";
+import { SubscriptionStatus } from "../generated/prisma";
 
 // Basic console logging until logger is set up
 const logger = {
@@ -113,7 +114,7 @@ export async function createSubscription(req: Request, res: Response) {
     const existingSubscription = await prisma.subscription.findFirst({
       where: {
         externalRef,
-        status: { in: ["active", "created"] },
+        status: { in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.CREATED] },
       },
     });
 
@@ -159,10 +160,12 @@ export async function createSubscription(req: Request, res: Response) {
         sourceApp,
         razorpaySubscriptionId: subscription.id,
         razorpayPlanId: planId,
-        status: subscription.status,
+        status: (
+          subscription.status as SubscriptionStatus
+        ).toUpperCase() as any,
         quantity,
         totalCount,
-        amountPaise: plan.item.amount,
+        amountPaise: BigInt(plan.item.amount),
         currency: plan.item.currency,
         currentStart: subscription.start_at
           ? new Date(subscription.start_at * 1000)
@@ -201,7 +204,7 @@ export async function createSubscription(req: Request, res: Response) {
             ? RAZORPAY_LIVE_KEY_ID
             : RAZORPAY_TEST_KEY_ID,
         subscription: record,
-      })
+      }),
     );
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -250,7 +253,7 @@ export async function cancelSubscription(req: Request, res: Response) {
       });
     }
 
-    if (subscription.status === "cancelled") {
+    if (subscription.status === SubscriptionStatus.CANCELLED) {
       return res.status(409).json({
         error: "already_cancelled",
         message: "Subscription is already cancelled",
@@ -260,14 +263,14 @@ export async function cancelSubscription(req: Request, res: Response) {
     // Cancel in Razorpay (false parameter means don't cancel at cycle end)
     const cancelledSubscription = await rzp.subscriptions.cancel(
       razorpaySubscriptionId,
-      false
+      false,
     );
 
     // Update database
     const updatedSubscription = await prisma.subscription.update({
       where: { razorpaySubscriptionId },
       data: {
-        status: cancelledSubscription.status,
+        status: (cancelledSubscription.status as string).toUpperCase() as any,
         updatedAt: new Date(),
       },
     });
@@ -291,7 +294,7 @@ export async function cancelSubscription(req: Request, res: Response) {
         id: razorpaySubscriptionId,
         status: cancelledSubscription.status,
         subscription: updatedSubscription,
-      })
+      }),
     );
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -342,7 +345,7 @@ export async function listSubscriptions(req: Request, res: Response) {
           limit,
           offset,
         },
-      })
+      }),
     );
   } catch (error) {
     logger.error("Failed to list subscriptions", {

@@ -34,6 +34,14 @@ enum SubscriptionStatus {
   EXPIRED
 }
 
+enum RazorpayPaymentMethod {
+  LINK
+  STANDARD
+  QR
+  UPI
+  POS
+}
+
 enum InvoiceStatus {
   DRAFT
   ISSUED
@@ -74,13 +82,14 @@ model Payment {
 
   status            PaymentStatus @default(CREATED)
 
-  method            String?
+  method            RazorpayPaymentMethod? @default(STANDARD)
   email             String?
   contact           String?
 
   metadata          Json?
 
   capturedAt        DateTime?
+  razorpayPaymentLink String? @unique
 
   refunds           Refund[]
   ledgerEntries     LedgerEntry[]
@@ -153,7 +162,7 @@ model WebhookEvent {
 
   receivedAt DateTime @default(now())
   createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  updatedAt  DateTime @default(now()) @updatedAt
 
   @@index([eventType])
   @@index([processed])
@@ -169,7 +178,7 @@ model Subscription {
   externalRef            String
   sourceApp              String?
 
-  customerRef            String
+  customerRef            String    @default("unknown")
 
   razorpaySubscriptionId String?   @unique
   razorpayPlanId         String?

@@ -24,17 +24,34 @@ const paymentConfirmSchema = z.object({
   razorpay_signature: z.string().min(1),
 });
 
+const paymentLinkSchema = z.object({
+  externalRef: z.string().min(1),
+  sourceApp: z.string().optional(),
+  amount: z.number().int().positive(),
+  currency: z.string().length(3),
+  email: z.email().optional(),
+  contact: z.string().optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
+  name: z.string().optional(),
+});
+
 router.post(
   "/payments/initiate",
   validate(paymentInitiateSchema as any),
   withIdempotency("initiate_payment"),
-  payments.initiate
+  payments.initiate,
 );
 
 router.post(
   "/payments/confirm",
   validate(paymentConfirmSchema as any),
-  payments.confirm
+  payments.confirm,
+);
+
+router.post(
+  "/payments/link",
+  validate(paymentLinkSchema as any),
+  payments.sendPaymentLink,
 );
 
 router.post("/webhooks/razorpay", webhooks.handleWebhook);
