@@ -10,12 +10,7 @@ import { raw } from "body-parser";
 import paymentRoutes from "./routes/payment";
 import subscriptionRoutes from "./routes/subscription";
 
-import {
-  ENVIRONMENT,
-  RAZORPAY_TEST_KEY_ID,
-  RAZORPAY_TEST_SECRET_KEY,
-  RAZORPAY_WEBHOOK_SECRET,
-} from "./utils/constants";
+import { ENVIRONMENT } from "./utils/constants";
 
 const app = express();
 
@@ -30,7 +25,7 @@ app.use(
   raw({
     type: "*/*",
     limit: "200kb",
-  })
+  }),
 );
 app.use(express.json({ limit: "200kb" }));
 
@@ -40,7 +35,7 @@ app.use(
     max: 100,
     standardHeaders: true,
     legacyHeaders: false,
-  })
+  }),
 );
 
 app.use(paymentRoutes);
